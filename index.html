@@ -1,9 +1,1013 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#192d58"><title>Monster Quest — Chore Adventures</title><style>
-:root{font-family:system-ui,-apple-system,sans-serif;color:#f7f8ff;background:#101a35}*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#182b56,#101a35 55%,#243259);min-height:100vh}main{max-width:530px;margin:auto;padding:18px 16px 110px}.top{display:flex;justify-content:space-between;align-items:center}.eyebrow{font-size:11px;letter-spacing:2px;color:#a9d4ff;font-weight:800}h1{font-size:26px;margin:5px 0}h2{font-size:20px;margin:5px 0 13px}.muted{color:#c1cce5;font-size:13px}.panel{background:#ffffff12;border:1px solid #ffffff24;border-radius:22px;padding:17px;margin:14px 0;box-shadow:0 9px 20px #0001}.hero{background:linear-gradient(120deg,#4556a6,#2c8c91);padding:20px}.pill{background:#ffffff25;border-radius:50px;padding:8px 12px;font-weight:800;font-size:13px}.stats{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.bar{height:12px;background:#0004;border-radius:30px;overflow:hidden}.bar>div{background:linear-gradient(90deg,#64e2b0,#f9d466);height:100%;transition:width .2s}.btn{border:0;border-radius:14px;padding:12px 14px;font-size:15px;font-weight:800;background:#ffdc74;color:#293252;cursor:pointer}.btn.secondary{background:#ffffff20;color:white;border:1px solid #ffffff35}.btn.small{padding:8px 11px;font-size:12px}.btn:disabled{opacity:.4;cursor:default}.row{display:flex;align-items:center;gap:12px;justify-content:space-between}.mission{background:#ffffff12;border-radius:16px;padding:12px;margin:9px 0;display:flex;align-items:center;gap:12px}.emoji{font-size:30px}.grow{flex:1}.done{opacity:.6}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.creature{border-radius:19px;padding:14px;text-align:center;background:linear-gradient(145deg,#ffffff25,#ffffff0c);border:1px solid #ffffff2c}.art{font-size:64px;filter:drop-shadow(0 7px 4px #0003);margin:7px 0}.creature strong{display:block}.nav{position:fixed;bottom:0;left:0;right:0;background:#101b39f5;border-top:1px solid #ffffff2b;display:flex;justify-content:center;padding:9px 4px calc(10px + env(safe-area-inset-bottom));z-index:5}.nav button{border:0;background:none;color:#c0cbe4;flex:1;max-width:110px;padding:7px 1px;font-size:11px;font-weight:700}.nav button.active{color:#ffdc74}.nav span{display:block;font-size:23px;margin-bottom:3px}input,select{background:#f4f6ff;color:#172449;border:0;border-radius:12px;padding:12px;font-size:16px;width:100%;margin:5px 0 10px}.hidden{display:none!important}.message{padding:12px;background:#ffe6a7;color:#2d3351;border-radius:14px;margin:10px 0;font-weight:700}.chip{display:inline-block;background:#ffffff20;padding:6px 9px;border-radius:10px;font-size:12px;margin:3px}.tiny{font-size:12px;color:#c1cce5}button:focus-visible,input:focus-visible{outline:3px solid #ffdc74}.scene{text-align:center;font-size:78px;padding:18px;background:linear-gradient(#4d9e98,#376274);border-radius:20px}.choice{display:flex;gap:8px;flex-wrap:wrap} .choice button{flex:1} .locked{filter:grayscale(1);opacity:.45}
-</style></head><body><main id="app"></main><nav class="nav" id="nav"></nav><script>
-const KEY='monsterquest_v1';const today=()=>new Date().toLocaleDateString('en-CA');const defaults=()=>({name:'',coins:0,xp:0,orbs:1,creatures:['Spriglet'],selected:'Spriglet',wins:0,lastDay:today(),completed:[],chores:[{id:1,title:'Make my bed',icon:'🛏️',xp:20},{id:2,title:'Brush my teeth',icon:'🪥',xp:15},{id:3,title:'Put away toys',icon:'🧸',xp:20},{id:4,title:'Finish schoolwork',icon:'📚',xp:30}],pin:'',reward:'Choose a family activity',rewardCost:120,claimed:0});
-let s;try{s={...defaults(),...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch(e){s=defaults()}let tab='home',notice='',parentOpen=false,parentUnlocked=false,challenge=0;const monsters=[{name:'Spriglet',icon:'🌱',type:'Leaf',power:3},{name:'Emberoo',icon:'🦊',type:'Flame',power:4},{name:'Bubblin',icon:'🐳',type:'Water',power:4},{name:'Voltkit',icon:'🐱',type:'Spark',power:5},{name:'Pebblix',icon:'🦔',type:'Stone',power:5},{name:'Moonwing',icon:'🦇',type:'Moon',power:6}];const enemies=[{name:'Mossmunch',icon:'🐛'},{name:'Cloudpuff',icon:'☁️'},{name:'Glimmerbug',icon:'🦋'}];
-function save(){localStorage.setItem(KEY,JSON.stringify(s))}function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function resetDay(){if(s.lastDay!==today()){s.completed=[];s.lastDay=today();save()}}function level(){return 1+Math.floor(s.xp/100)}function say(x){notice=x;render()}function button(text,fn,secondary=false){return `<button class="btn ${secondary?'secondary':''}" onclick="${fn}">${text}</button>`}function header(){return `<div class="top"><div><div class="eyebrow">MONSTER QUEST</div><h1>Hi, ${esc(s.name)}! ✨</h1></div><div class="pill">⭐ Lv ${level()}</div></div><div class="stats"><span class="pill">🪙 ${s.coins}</span><span class="pill">🔮 ${s.orbs} orbs</span><span class="pill">⚡ ${s.xp} XP</span></div>`}function nav(){document.getElementById('nav').innerHTML=s.name?['home','creatures','explore','rewards','parent'].map((t,i)=>`<button class="${tab===t?'active':''}" onclick="go('${t}')"><span>${['🏠','🐾','🗺️','🎁','🔒'][i]}</span>${['Missions','Creatures','Explore','Rewards','Parent'][i]}</button>`).join(''):''}function go(t){tab=t;notice='';render()}
-function render(){resetDay();const a=document.getElementById('app');if(!s.name){a.innerHTML=`<div class="panel hero" style="margin-top:12vh;text-align:center"><div style="font-size:80px">🌱🦊🐳</div><div class="eyebrow">WELCOME, ADVENTURER!</div><h1>Monster Quest</h1><p>Complete real-life missions. Collect magical friends. Explore the world!</p><label for="heroName">Choose your hero name</label><input id="heroName" maxlength="20" placeholder="Your hero name" autocomplete="off"><button class="btn" onclick="start()">Start my adventure →</button></div>`;nav();return}let html=header();if(notice)html+=`<div class="message" role="status">${esc(notice)}</div>`;if(tab==='home'){let n=s.completed.length;html+=`<div class="panel hero"><h2>🌟 Today's Quest</h2><p>Complete missions to earn coins, XP, and capture orbs!</p><div class="row"><b>${n} of ${s.chores.length} missions</b><b>${s.chores.length?Math.round(n/s.chores.length*100):100}%</b></div><div class="bar"><div style="width:${s.chores.length?n/s.chores.length*100:100}%"></div></div></div><h2>📜 Daily missions</h2>`;html+=s.chores.map(c=>`<div class="mission ${s.completed.includes(c.id)?'done':''}"><div class="emoji">${esc(c.icon)}</div><div class="grow"><b>${esc(c.title)}</b><div class="tiny">+${c.xp} XP · +${Math.ceil(c.xp/2)} coins</div></div><button class="btn small" ${s.completed.includes(c.id)?'disabled':''} onclick="complete(${c.id})">${s.completed.includes(c.id)?'✓ Done':'Done!'}</button></div>`).join('');html+=`<div class="panel"><b>🐾 Your companion: ${esc(s.selected)}</b><p class="muted">Finish all missions for a bonus capture orb!</p></div>`}else if(tab==='creatures'){html+=`<div class="panel"><h2>🐾 Creature Collection</h2><p class="muted">You have ${s.creatures.length} of ${monsters.length} original creatures. Spend one orb to discover a new friend!</p><button class="btn" onclick="capture()" ${s.orbs<1||s.creatures.length===monsters.length?'disabled':''}>🔮 Discover creature (1 orb)</button></div><div class="grid">`+monsters.map(m=>{let owned=s.creatures.includes(m.name);return `<div class="creature ${owned?'':'locked'}"><div class="art">${owned?m.icon:'❔'}</div><strong>${owned?m.name:'Undiscovered'}</strong><div class="tiny">${owned?m.type+' · Power '+m.power:'Complete quests to find'}</div>${owned?`<button class="btn small ${s.selected===m.name?'secondary':''}" onclick="selectCreature('${m.name}')">${s.selected===m.name?'✓ Buddy':'Choose'}</button>`:''}</div>`}).join('')+`</div><div class="panel"><h2>✨ Creature Growth</h2><p>Your buddy grows stronger as you level up. Evolution stages unlock at levels 3 and 6!</p><b>Current stage: ${level()>=6?'🌟 Legendary form':level()>=3?'✨ Evolved form':'🌱 Young companion'}</b></div>`}else if(tab==='explore'){let enemy=enemies[challenge%enemies.length];html+=`<div class="panel"><h2>🗺️ Whisperwood Forest</h2><div class="scene">🌳 ${enemy.icon} 🌲</div><p>A wild ${enemy.name} wants a friendly challenge!</p><div class="row"><span>🐾 ${esc(s.selected)}</span><span>⚔️</span><span>${enemy.icon} ${enemy.name}</span></div><p class="muted">Answer a simple question to win. No fighting or scary content.</p>${button('Start challenge','battle()')}</div><div class="panel"><b>🏆 Challenges won: ${s.wins}</b><p class="tiny">Each win earns 5 XP. Missions are the main way to earn capture orbs.</p></div>`}else if(tab==='rewards'){html+=`<div class="panel"><h2>🎁 Treasure Shop</h2><div class="scene">🎁✨🏆</div><h2>${esc(s.reward)}</h2><p>Cost: 🪙 ${s.rewardCost} coins</p><p class="muted">Ask your parent to approve your reward!</p><button class="btn" onclick="claim()" ${s.coins<s.rewardCost?'disabled':''}>Request reward</button><p class="tiny">Rewards claimed: ${s.claimed}. Parent approval required.</p></div>`}else if(tab==='parent'){html+=`<div class="panel"><h2>🔒 Parent Zone</h2>${!s.pin?`<p>Create a 4–8 digit parent PIN. Don't share it with your child.</p><input id="pinNew" type="password" inputmode="numeric" maxlength="8" placeholder="New parent PIN"><button class="btn" onclick="setPin()">Create PIN</button>`:!parentUnlocked?`<p>Enter your parent PIN to manage missions and rewards.</p><input id="pinTry" type="password" inputmode="numeric" maxlength="8" placeholder="Parent PIN"><button class="btn" onclick="unlock()">Unlock</button>`:`<div class="row"><b>Manage missions</b>${button('Lock','lock()',true)}</div><p class="tiny">Completed missions can be changed for future days. Daily completion resets automatically.</p>${s.chores.map(c=>`<div class="mission"><span>${esc(c.icon)}</span><div class="grow">${esc(c.title)} · ${c.xp} XP</div><button class="btn small secondary" onclick="removeChore(${c.id})">Remove</button></div>`).join('')}<label>New chore</label><input id="choreName" maxlength="45" placeholder="e.g. Feed the dog"><label>XP reward</label><select id="choreXp"><option value="10">10 XP</option><option value="20" selected>20 XP</option><option value="30">30 XP</option><option value="40">40 XP</option></select><button class="btn" onclick="addChore()">Add mission</button><hr><label>Family reward</label><input id="rewardName" maxlength="60" value="${esc(s.reward)}"><label>Coin cost</label><input id="rewardCost" type="number" min="1" max="9999" value="${s.rewardCost}"><button class="btn" onclick="updateReward()">Save reward</button><hr><button class="btn secondary" onclick="resetProgress()">Reset game progress</button>`}</div>`}a.innerHTML=html;nav()}
-function start(){let v=document.getElementById('heroName').value.trim();if(v.length<1)return alert('Choose a hero name first!');s.name=v.slice(0,20);save();render()}function complete(id){let c=s.chores.find(x=>x.id===id);if(!c||s.completed.includes(id))return;s.completed.push(id);s.xp+=c.xp;s.coins+=Math.ceil(c.xp/2);let bonus=s.chores.length>0&&s.completed.length===s.chores.length;if(bonus)s.orbs++;save();say(bonus?'🎉 All missions complete! You earned a bonus capture orb!':`Great job! +${c.xp} XP and +${Math.ceil(c.xp/2)} coins!`)}function capture(){if(s.orbs<1)return;let available=monsters.filter(m=>!s.creatures.includes(m.name));if(!available.length)return;let m=available[Math.floor(Math.random()*available.length)];s.orbs--;s.creatures.push(m.name);save();say(`✨ You discovered ${m.name}!`)}function selectCreature(n){if(!s.creatures.includes(n))return;s.selected=n;save();say(`${n} is your new buddy!`)}function battle(){let q=Math.floor(Math.random()*8)+2, r=Math.floor(Math.random()*7)+1;let answer=prompt(`Friendly challenge! What is ${q} + ${r}?`);if(answer===null)return;if(Number(answer)===q+r&&answer.trim()!==''){s.wins++;s.xp+=5;challenge++;save();say('🎉 Great answer! Your buddy won! +5 XP')}else say(`Good try! The answer is ${q+r}. Try another challenge!`)}function claim(){if(s.coins<s.rewardCost)return;parentOpen=true;let p=prompt('Parent approval: enter your PIN to redeem the reward');if(p===null)return;if(!s.pin){say('Ask a parent to create a PIN in the Parent tab first.');return}if(p!==s.pin){say('Parent approval not granted.');return}s.coins-=s.rewardCost;s.claimed++;save();say(`🎁 Reward approved: ${s.reward}!`)}function setPin(){let p=document.getElementById('pinNew').value;if(!/^\d{4,8}$/.test(p))return alert('Choose 4 to 8 digits');s.pin=p;parentUnlocked=true;save();say('Parent PIN created. You can now manage missions.')}function unlock(){if(document.getElementById('pinTry').value===s.pin){parentUnlocked=true;render()}else alert('Incorrect PIN')}function lock(){parentUnlocked=false;render()}function addChore(){if(!parentUnlocked)return;let v=document.getElementById('choreName').value.trim();if(!v)return alert('Enter a chore');s.chores.push({id:Date.now(),title:v.slice(0,45),icon:'⭐',xp:Number(document.getElementById('choreXp').value)});save();say('Mission added!')}function removeChore(id){if(!parentUnlocked)return;s.chores=s.chores.filter(x=>x.id!==id);s.completed=s.completed.filter(x=>x!==id);save();render()}function updateReward(){if(!parentUnlocked)return;let n=document.getElementById('rewardName').value.trim(),c=Number(document.getElementById('rewardCost').value);if(!n||!Number.isInteger(c)||c<1||c>9999)return alert('Enter a reward and a valid cost');s.reward=n;s.rewardCost=c;save();say('Reward updated!')}function resetProgress(){if(!parentUnlocked)return;if(!confirm('Reset coins, creatures, and XP? Chores and parent PIN will stay.'))return;s.coins=0;s.xp=0;s.orbs=1;s.creatures=['Spriglet'];s.selected='Spriglet';s.wins=0;s.claimed=0;s.completed=[];save();say('Adventure progress reset.')}render();
-</script></body></html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17244b">
+<title>Monster Quest: Chore Adventures</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:linear-gradient(150deg,#233e79,#121c3c);color:white;min-height:100vh}
+main{max-width:580px;margin:auto;padding:18px 15px 110px}
+h1{font-size:28px;margin:8px 0}
+h2{font-size:21px}
+p{line-height:1.5}
+.card{background:#ffffff16;border:1px solid #ffffff30;border-radius:20px;padding:17px;margin:13px 0}
+.hero{background:linear-gradient(120deg,#5366b9,#248c91)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wrap{display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:#ffffff25;border-radius:30px;padding:8px 12px;font-weight:700}
+button{background:#ffda71;color:#263456;border:0;border-radius:13px;padding:11px 14px;font-size:14px;font-weight:800;cursor:pointer}
+button:disabled{opacity:.45}
+.secondary{background:#ffffff22;color:white;border:1px solid #ffffff40}
+.small{padding:8px 10px;font-size:12px}
+input,select{width:100%;padding:12px;border:0;border-radius:12px;font-size:16px;margin:7px 0 12px;background:#fff;color:#17244b}
+label{display:block;margin-top:8px;font-weight:600}
+.muted{color:#c8d3ee;font-size:13px}
+.task{display:flex;align-items:center;gap:11px;padding:13px;margin:9px 0;background:#ffffff15;border-radius:15px}
+.task.done{opacity:.65}
+.task .name{flex:1}
+.emoji{font-size:29px}
+.bar{height:13px;background:#0005;border-radius:20px;overflow:hidden}
+.fill{height:100%;background:linear-gradient(90deg,#60dfaa,#ffe27a)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.monster{background:#ffffff18;border:1px solid #ffffff35;border-radius:18px;padding:15px;text-align:center}
+.art{font-size:65px;margin:10px 0}
+nav{position:fixed;bottom:0;left:0;right:0;background:#111c3cf7;display:flex;justify-content:center;padding:8px 2px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #ffffff30}
+nav button{background:transparent;color:#c6d2ef;flex:1;max-width:115px;font-size:11px;padding:5px 1px}
+nav button.active{color:#ffdc75}
+nav span{display:block;font-size:23px}
+.notice{background:#ffe4a0;color:#263456;border-radius:14px;padding:12px;margin:12px 0;font-weight:700}
+.scene{background:linear-gradient(#4ca69e,#376d83);border-radius:20px;text-align:center;padding:24px;font-size:75px}
+hr{border:0;border-top:1px solid #ffffff30;margin:20px 0}
+.starters{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.starter{background:#ffffff20;color:white;border:2px solid #ffffff30;padding:9px 3px}
+.starter.chosen{border-color:#ffdc75}
+.starter .art{font-size:42px}
+.checkday{display:inline-flex;align-items:center;gap:4px;margin:5px}
+.checkday input{width:auto;margin:0}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+"use strict";
+
+const STORAGE="monsterquest_v1";
+const ZONE="America/Chicago";
+
+function centralGameDate(){
+  const p=Object.fromEntries(
+    new Intl.DateTimeFormat("en-US",{
+      timeZone:ZONE,
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit",
+      hour:"2-digit",
+      hourCycle:"h23"
+    }).formatToParts(new Date())
+    .filter(x=>x.type!=="literal")
+    .map(x=>[x.type,x.value])
+  );
+  const d=new Date(Date.UTC(+p.year,+p.month-1,+p.day));
+  if(+p.hour<21)d.setUTCDate(d.getUTCDate()-1);
+  return d;
+}
+function dayKey(){
+  return centralGameDate().toISOString().slice(0,10);
+}
+function weekKey(){
+  const d=centralGameDate();
+  d.setUTCDate(d.getUTCDate()-d.getUTCDay());
+  return d.toISOString().slice(0,10);
+}
+
+const defaultChores=[
+  {id:1,title:"Make my bed",icon:"🛏️",xp:20},
+  {id:2,title:"Brush my teeth",icon:"🪥",xp:15},
+  {id:3,title:"Put away toys",icon:"🧸",xp:20},
+  {id:4,title:"Finish schoolwork",icon:"📚",xp:30},
+  {id:5,title:"Feed Sparks",icon:"🐾",xp:10},
+  {id:6,title:"Clean litter box",icon:"🐱",xp:10},
+  {id:7,title:"Martial arts moves",icon:"🥋",xp:10},
+  {id:8,title:"Unload the dishwasher",icon:"🍽️",xp:20}
+];
+
+const species=[
+  {name:"Spriglet",icon:"🌱",type:"Leaf"},
+  {name:"Emberoo",icon:"🦊",type:"Fire"},
+  {name:"Bubbloo",icon:"🐳",type:"Water"},
+  {name:"Voltkit",icon:"🐱",type:"Electric"},
+  {name:"Pebblix",icon:"🦔",type:"Stone"},
+  {name:"Moonwing",icon:"🦇",type:"Moon"}
+];
+
+const evolutions={
+  Spriglet:["Spriglet","Thornix","Floragon"],
+  Emberoo:["Emberoo","Flareclaw","Inferagon"],
+  Bubbloo:["Bubbloo","Tiderush","Aquarion"]
+};
+
+function fresh(){
+  return {
+    name:"",
+    coins:0,
+    xp:0,
+    orbs:1,
+    creatures:["Spriglet"],
+    selected:"Spriglet",
+    creatureXp:{},
+    evolutionStages:{},
+    nicknames:{},
+    wins:0,
+    chores:defaultChores,
+    completed:[],
+    completedOnce:[],
+    lastDay:dayKey(),
+    dailyPoints:0,
+    weeklyPoints:0,
+    weekStart:weekKey(),
+    weeklyHistory:[],
+    pin:"",
+    reward:"Choose a family activity",
+    rewardCost:120,
+    claimed:0,
+    musicOn:false,
+    effectsOn:true,
+    criesOn:true
+  };
+}
+
+let state;
+try{
+  const old=JSON.parse(localStorage.getItem(STORAGE)||"{}");
+  state={...fresh(),...old};
+}catch(e){
+  state=fresh();
+}
+
+if(!Array.isArray(state.chores))state.chores=defaultChores;
+if(!Array.isArray(state.completed))state.completed=[];
+if(!Array.isArray(state.creatures))state.creatures=["Spriglet"];
+if(!Array.isArray(state.completedOnce))state.completedOnce=[];
+if(!Array.isArray(state.weeklyHistory))state.weeklyHistory=[];
+if(!state.creatureXp)state.creatureXp={};
+if(!state.evolutionStages)state.evolutionStages={};
+if(!state.nicknames)state.nicknames={};
+
+let page="missions";
+let message="";
+let parentUnlocked=false;
+let starter="Spriglet";
+let enemyIndex=0;
+
+function save(){
+  localStorage.setItem(STORAGE,JSON.stringify(state));
+}
+function escapeHTML(v){
+  return String(v).replace(/[&<>"']/g,c=>({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[c]));
+}
+function resetPeriods(){
+  let changed=false;
+  const w=weekKey();
+  const d=dayKey();
+
+  if(state.weekStart!==w){
+    state.weeklyHistory.push({
+      week:state.weekStart,
+      points:state.weeklyPoints||0
+    });
+    state.weeklyHistory=state.weeklyHistory.slice(-20);
+    state.weeklyPoints=0;
+    state.weekStart=w;
+    changed=true;
+  }
+
+  if(state.lastDay!==d){
+    state.completed=[];
+    state.dailyPoints=0;
+    state.lastDay=d;
+    changed=true;
+  }
+
+  if(changed)save();
+}
+
+function level(){
+  return 1+Math.floor(state.xp/100);
+}
+function creatureLevel(n){
+  return 1+Math.floor((state.creatureXp[n]||0)/100);
+}
+function stage(n){
+  return state.evolutionStages[n]||1;
+}
+function evolvedName(n){
+  return evolutions[n]
+    ? evolutions[n][Math.min(2,stage(n)-1)]
+    : n;
+}
+function creatureName(n){
+  const nickname=state.nicknames[n];
+  return nickname
+    ? nickname+" ("+evolvedName(n)+")"
+    : evolvedName(n);
+}
+function creatureIcon(n){
+  const m=species.find(x=>x.name===n);
+  return m?m.icon:"✨";
+}
+function canEvolve(n){
+  if(!evolutions[n]||stage(n)>=3)return false;
+  return creatureLevel(n)>=(stage(n)===1?10:25);
+}
+function activeChores(){
+  const day=centralGameDate().getUTCDay();
+  return state.chores.filter(c=>{
+    if(c.schedule==="once")
+      return !state.completedOnce.includes(c.id);
+    if(c.schedule==="weekly")
+      return Array.isArray(c.days)&&c.days.includes(day);
+    return true;
+  });
+}
+function announce(text){
+  message=text;
+  render();
+}
+function go(p){
+  page=p;
+  message="";
+  render();
+}
+
+function renderNav(){
+  const nav=document.getElementById("nav");
+  if(!state.name){
+    nav.innerHTML="";
+    return;
+  }
+  const tabs=[
+    ["missions","🏠","Missions"],
+    ["creatures","🐾","Creatures"],
+    ["explore","🗺️","Explore"],
+    ["rewards","🎁","Rewards"],
+    ["parent","🔒","Parent"]
+  ];
+  nav.innerHTML=tabs.map(t=>
+    '<button class="'+(page===t[0]?"active":"")+
+    '" onclick="go(\''+t[0]+'\')">'+
+    '<span>'+t[1]+'</span>'+t[2]+"</button>"
+  ).join("");
+}
+
+function render(){
+  resetPeriods();
+  const app=document.getElementById("app");
+
+  if(!state.name){
+    app.innerHTML=`
+      <div class="card hero" style="margin-top:10vh;text-align:center">
+        <div style="font-size:65px">🌱🦊🐳</div>
+        <h1>Monster Quest</h1>
+        <p>Complete real-life missions, earn treasures,
+        and collect magical creatures!</p>
+        <label>Your hero name</label>
+        <input id="heroName" maxlength="20"
+          placeholder="Enter your name">
+        <h2>Choose your first companion</h2>
+        <div class="starters">
+          ${species.slice(0,3).map(m=>`
+            <button class="starter ${starter===m.name?"chosen":""}"
+              onclick="chooseStarter('${m.name}')">
+              <div class="art">${m.icon}</div>
+              ${m.name}
+              <div class="muted">${m.type}</div>
+            </button>
+          `).join("")}
+        </div>
+        <p><button onclick="startGame()">Start Adventure!</button></p>
+      </div>`;
+    renderNav();
+    return;
+  }
+
+  let html=`
+    <div class="row">
+      <div>
+        <div class="muted">MONSTER QUEST</div>
+        <h1>Hi, ${escapeHTML(state.name)}! ✨</h1>
+      </div>
+      <span class="pill">⭐ Lv ${level()}</span>
+    </div>
+    <div class="wrap">
+      <span class="pill">🪙 ${state.coins}</span>
+      <span class="pill">🔮 ${state.orbs} orbs</span>
+      <span class="pill">⚡ ${state.xp} XP</span>
+    </div>
+    <div class="wrap" style="margin-top:12px">
+      <button class="secondary small" onclick="toggleMusic()">
+        🎵 Music ${state.musicOn?"On":"Off"}
+      </button>
+      <button class="secondary small" onclick="toggleEffects()">
+        🔔 Effects ${state.effectsOn?"On":"Off"}
+      </button>
+      <button class="secondary small" onclick="toggleCries()">
+        🐾 Cries ${state.criesOn?"On":"Off"}
+      </button>
+    </div>
+  `;
+
+  if(message){
+    html+='<div class="notice" role="status">'+
+      escapeHTML(message)+"</div>";
+  }
+
+  if(page==="missions"){
+    const chores=activeChores();
+    const finished=chores.filter(c=>
+      state.completed.includes(c.id)).length;
+    const pct=chores.length
+      ?Math.round(finished/chores.length*100):100;
+
+    html+=`
+      <div class="card hero">
+        <h2>🌟 Today's Quest</h2>
+        <div class="row">
+          <strong>☀️ Today: ${state.dailyPoints||0} pts</strong>
+          <strong>🏆 Week: ${state.weeklyPoints||0} pts</strong>
+        </div>
+        <p class="muted">
+          Daily reset: 9 PM Central<br>
+          Weekly reset: Sunday at 9 PM Central
+        </p>
+        <div class="row">
+          <strong>${finished} of ${chores.length} missions</strong>
+          <strong>${pct}%</strong>
+        </div>
+        <div class="bar">
+          <div class="fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <h2>📜 Your Missions</h2>
+    `;
+
+    html+=chores.map(c=>{
+      const done=state.completed.includes(c.id);
+      return `
+        <div class="task ${done?"done":""}">
+          <div class="emoji">${escapeHTML(c.icon||"⭐")}</div>
+          <div class="name">
+            <strong>${escapeHTML(c.title)}</strong>
+            <div class="muted">
+              +${c.xp} points ·
+              +${Math.ceil(c.xp/2)} coins
+            </div>
+          </div>
+          <button class="small"
+            ${done?"disabled":""}
+            onclick="completeChore(${c.id})">
+            ${done?"✓ Done":"Done!"}
+          </button>
+        </div>
+      `;
+    }).join("");
+
+    html+=`
+      <div class="card">
+        <h2>🐾 Your Companion</h2>
+        <p>${creatureIcon(state.selected)}
+          ${escapeHTML(creatureName(state.selected))}
+        </p>
+        <p class="muted">
+          Finish your missions to earn XP and treasure!
+        </p>
+      </div>
+    `;
+  }
+
+  if(page==="creatures"){
+    html+=`
+      <div class="card">
+        <h2>🐾 Creature Collection</h2>
+        <p>You have ${state.creatures.length}
+        of ${species.length} creatures!</p>
+        <p>Capture orbs: 🔮 ${state.orbs}</p>
+        <button onclick="captureCreature()"
+          ${state.orbs<1?"disabled":""}>
+          Use Capture Orb
+        </button>
+      </div>
+      <div class="grid">
+    `;
+
+    html+=species.map(m=>{
+      const owned=state.creatures.includes(m.name);
+      const selected=state.selected===m.name;
+      return `
+        <div class="monster">
+          <div class="art">${owned?m.icon:"❔"}</div>
+          <strong>${owned
+            ?escapeHTML(creatureName(m.name))
+            :"Undiscovered"}</strong>
+          <p class="muted">${m.type}</p>
+          ${owned?`
+            <p class="muted">
+              Level ${creatureLevel(m.name)}
+            </p>
+            <button class="small"
+              onclick="selectBuddy('${m.name}')">
+              ${selected?"✓ Buddy":"Choose"}
+            </button>
+          `:""}
+        </div>
+      `;
+    }).join("");
+
+    html+="</div>";
+
+    const n=state.selected;
+    html+=`
+      <div class="card">
+        <h2>✨ Companion Training</h2>
+        <div class="art" style="text-align:center">
+          ${creatureIcon(n)}
+        </div>
+        <h2>${escapeHTML(creatureName(n))}</h2>
+        <p>Creature level: ${creatureLevel(n)}</p>
+        <p>Creature XP: ${state.creatureXp[n]||0}</p>
+        <p class="muted">
+          Evolutions unlock at levels 10 and 25.
+        </p>
+        ${canEvolve(n)?`
+          <button onclick="evolveBuddy()">✨ Evolve!</button>
+        `:""}
+        <button class="secondary" onclick="nicknameBuddy()">
+          Give Nickname
+        </button>
+      </div>
+    `;
+  }
+
+  if(page==="explore"){
+    const enemies=[
+      ["🐛","Mossmunch"],
+      ["☁️","Cloudpuff"],
+      ["🦋","Glimmerbug"]
+    ];
+    const enemy=enemies[enemyIndex%enemies.length];
+
+    html+=`
+      <div class="card">
+        <h2>🗺️ Whisperwood Forest</h2>
+        <div class="scene">🌳 ${enemy[0]} 🌲</div>
+        <p>A wild ${enemy[1]} wants a friendly challenge!</p>
+        <p>
+          ${creatureIcon(state.selected)}
+          ${escapeHTML(creatureName(state.selected))}
+          ⚔️ ${enemy[0]} ${enemy[1]}
+        </p>
+        <p class="muted">
+          Answer a math question to win!
+        </p>
+        <button onclick="challenge()">Start Challenge</button>
+      </div>
+      <div class="card">
+        🏆 Challenges won: ${state.wins||0}
+      </div>
+    `;
+  }
+
+  if(page==="rewards"){
+    html+=`
+      <div class="card">
+        <h2>🎁 Treasure Shop</h2>
+        <div class="scene">🎁✨🏆</div>
+        <h2>${escapeHTML(state.reward)}</h2>
+        <p>Cost: 🪙 ${state.rewardCost} coins</p>
+        <p class="muted">Parent approval required.</p>
+        <button onclick="claimReward()"
+          ${state.coins<state.rewardCost?"disabled":""}>
+          Request Reward
+        </button>
+        <p class="muted">
+          Rewards claimed: ${state.claimed||0}
+        </p>
+      </div>
+    `;
+  }
+
+  if(page==="parent"){
+    html+=parentHTML();
+  }
+
+  app.innerHTML=html;
+  renderNav();
+}
+
+function parentHTML(){
+  if(!state.pin){
+    return `
+      <div class="card">
+        <h2>🔒 Parent Zone</h2>
+        <p>Create a 4–8 digit parent PIN.</p>
+        <input id="newPin" type="password"
+          inputmode="numeric" maxlength="8"
+          placeholder="New PIN">
+        <button onclick="createPin()">Create PIN</button>
+      </div>
+    `;
+  }
+
+  if(!parentUnlocked){
+    return `
+      <div class="card">
+        <h2>🔒 Parent Zone</h2>
+        <input id="enteredPin" type="password"
+          inputmode="numeric" placeholder="Parent PIN">
+        <button onclick="unlockParent()">Unlock</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card">
+      <div class="row">
+        <h2>Parent Controls</h2>
+        <button class="secondary small"
+          onclick="lockParent()">Lock</button>
+      </div>
+
+      <h2>Manage Chores</h2>
+      ${state.chores.map(c=>`
+        <div class="task">
+          <span>${escapeHTML(c.icon||"⭐")}</span>
+          <div class="name">
+            ${escapeHTML(c.title)}
+            <div class="muted">${c.xp} points</div>
+          </div>
+          <button class="secondary small"
+            onclick="removeChore(${c.id})">
+            Remove
+          </button>
+        </div>
+      `).join("")}
+
+      <hr>
+      <h2>Add a Chore</h2>
+      <label>Chore name</label>
+      <input id="choreName" maxlength="45"
+        placeholder="New mission">
+
+      <label>Repeat</label>
+      <select id="choreRepeat" onchange="showWeekdays()">
+        <option value="daily">Every day</option>
+        <option value="weekly">Selected weekdays</option>
+        <option value="once">One time</option>
+      </select>
+
+      <div id="weekdayBox" style="display:none">
+        ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+          .map((d,i)=>`
+            <label class="checkday">
+              <input type="checkbox" class="weekday"
+                value="${i}">${d}
+            </label>
+          `).join("")}
+      </div>
+
+      <label>Points and XP</label>
+      <select id="chorePoints">
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20" selected>20</option>
+        <option value="30">30</option>
+        <option value="40">40</option>
+      </select>
+
+      <button onclick="addChore()">Add Mission</button>
+
+      <hr>
+      <h2>Family Reward</h2>
+      <label>Reward name</label>
+      <input id="rewardName" maxlength="60"
+        value="${escapeHTML(state.reward)}">
+
+      <label>Coin cost</label>
+      <input id="rewardCost" type="number"
+        min="1" max="9999"
+        value="${state.rewardCost}">
+
+      <button onclick="saveReward()">Save Reward</button>
+
+      <hr>
+      <h2>Weekly History</h2>
+      ${state.weeklyHistory.length
+        ?state.weeklyHistory.slice().reverse().map(w=>`
+          <p>${escapeHTML(w.week)}:
+          ${w.points} points</p>
+        `).join("")
+        :'<p class="muted">No completed weeks yet.</p>'}
+
+      <hr>
+      <button class="secondary" onclick="resetGame()">
+        Reset Adventure Progress
+      </button>
+    </div>
+  `;
+}
+
+function chooseStarter(n){
+  starter=n;
+  render();
+}
+
+function startGame(){
+  const name=document.getElementById("heroName").value.trim();
+  if(!name){
+    alert("Enter your hero name!");
+    return;
+  }
+  state.name=name.slice(0,20);
+  state.creatures=[starter];
+  state.selected=starter;
+  save();
+  playSound("victory");
+  render();
+}
+
+function completeChore(id){
+  resetPeriods();
+  const chore=state.chores.find(c=>c.id===id);
+  if(!chore||state.completed.includes(id))return;
+  if(!activeChores().some(c=>c.id===id))return;
+
+  state.completed.push(id);
+
+  if(chore.schedule==="once"){
+    state.completedOnce.push(id);
+  }
+
+  const points=Number(chore.xp)||10;
+  const coins=Math.ceil(points/2);
+
+  state.xp+=points;
+  state.coins+=coins;
+  state.dailyPoints=(state.dailyPoints||0)+points;
+  state.weeklyPoints=(state.weeklyPoints||0)+points;
+  state.creatureXp[state.selected]=
+    (state.creatureXp[state.selected]||0)+points;
+
+  const chores=activeChores();
+  const allDone=chores.length>0&&
+    chores.every(c=>state.completed.includes(c.id));
+
+  if(allDone)state.orbs++;
+
+  save();
+  playSound(allDone?"victory":"chore");
+
+  announce(allDone
+    ?"🎉 All missions complete! Bonus capture orb earned!"
+    :"Great job! +"+points+" points and +"+coins+" coins!");
+}
+
+function captureCreature(){
+  if(state.orbs<1)return;
+
+  const available=species.filter(m=>
+    !state.creatures.includes(m.name));
+
+  if(!available.length){
+    announce("You have discovered every creature!");
+    return;
+  }
+
+  const m=available[
+    Math.floor(Math.random()*available.length)
+  ];
+
+  state.orbs--;
+  state.creatures.push(m.name);
+  save();
+  playSound("capture");
+  announce("✨ You discovered "+m.name+"!");
+}
+
+function selectBuddy(n){
+  if(!state.creatures.includes(n))return;
+  state.selected=n;
+  save();
+  playSound("creature");
+  announce(n+" is your new companion!");
+}
+
+function evolveBuddy(){
+  const n=state.selected;
+  if(!canEvolve(n))return;
+
+  state.evolutionStages[n]=stage(n)+1;
+  save();
+  playSound("evolve");
+  announce("✨ Your companion evolved into "+
+    evolvedName(n)+"!");
+}
+
+function nicknameBuddy(){
+  const n=state.selected;
+  const answer=prompt(
+    "Choose a nickname for your companion:",
+    state.nicknames[n]||""
+  );
+  if(answer===null)return;
+
+  const value=answer.trim().slice(0,20);
+  if(value)state.nicknames[n]=value;
+  else delete state.nicknames[n];
+
+  save();
+  render();
+}
+
+function challenge(){
+  const a=Math.floor(Math.random()*8)+2;
+  const b=Math.floor(Math.random()*7)+1;
+  const answer=prompt("What is "+a+" + "+b+"?");
+
+  if(answer===null)return;
+
+  if(answer.trim()!==""&&Number(answer)===a+b){
+    state.wins=(state.wins||0)+1;
+    state.xp+=5;
+    enemyIndex++;
+    save();
+    playSound("victory");
+    announce("🎉 Correct! You earned 5 XP!");
+  }else{
+    announce("Good try! The answer was "+(a+b)+".");
+  }
+}
+
+function claimReward(){
+  if(state.coins<state.rewardCost)return;
+
+  if(!state.pin){
+    announce("Ask a parent to create a PIN first.");
+    return;
+  }
+
+  const pin=prompt("Parent approval: enter PIN");
+  if(pin===null)return;
+
+  if(pin!==state.pin){
+    announce("Parent approval not granted.");
+    return;
+  }
+
+  state.coins-=state.rewardCost;
+  state.claimed=(state.claimed||0)+1;
+  save();
+  playSound("victory");
+  announce("🎁 Reward approved: "+state.reward+"!");
+}
+
+function createPin(){
+  const pin=document.getElementById("newPin").value;
+  if(!/^\d{4,8}$/.test(pin)){
+    alert("Choose 4 to 8 digits.");
+    return;
+  }
+  state.pin=pin;
+  parentUnlocked=true;
+  save();
+  announce("Parent PIN created.");
+}
+
+function unlockParent(){
+  const pin=document.getElementById("enteredPin").value;
+  if(pin!==state.pin){
+    alert("Incorrect PIN");
+    return;
+  }
+  parentUnlocked=true;
+  render();
+}
+
+function lockParent(){
+  parentUnlocked=false;
+  render();
+}
+
+function showWeekdays(){
+  document.getElementById("weekdayBox").style.display=
+    document.getElementById("choreRepeat").value==="weekly"
+      ?"block":"none";
+}
+
+function addChore(){
+  if(!parentUnlocked)return;
+
+  const name=document.getElementById("choreName").value.trim();
+  const repeat=document.getElementById("choreRepeat").value;
+  const xp=Number(document.getElementById("chorePoints").value);
+  const days=[...document.querySelectorAll(".weekday:checked")]
+    .map(el=>Number(el.value));
+
+  if(!name){
+    alert("Enter a chore name.");
+    return;
+  }
+  if(repeat==="weekly"&&!days.length){
+    alert("Choose at least one weekday.");
+    return;
+  }
+
+  state.chores.push({
+    id:Date.now(),
+    title:name.slice(0,45),
+    icon:"⭐",
+    xp,
+    schedule:repeat,
+    days
+  });
+
+  save();
+  announce("New mission added!");
+}
+
+function removeChore(id){
+  if(!parentUnlocked)return;
+  if(!confirm("Remove this mission?"))return;
+
+  state.chores=state.chores.filter(c=>c.id!==id);
+  state.completed=state.completed.filter(x=>x!==id);
+  state.completedOnce=state.completedOnce.filter(x=>x!==id);
+
+  save();
+  render();
+}
+
+function saveReward(){
+  if(!parentUnlocked)return;
+
+  const name=document.getElementById("rewardName").value.trim();
+  const cost=Number(document.getElementById("rewardCost").value);
+
+  if(!name||!Number.isInteger(cost)||cost<1||cost>9999){
+    alert("Enter a valid reward and coin cost.");
+    return;
+  }
+
+  state.reward=name;
+  state.rewardCost=cost;
+  save();
+  announce("Reward updated!");
+}
+
+function resetGame(){
+  if(!parentUnlocked)return;
+  if(!confirm("Reset XP, coins, and creatures?"))return;
+
+  state.coins=0;
+  state.xp=0;
+  state.orbs=1;
+  state.creatures=["Spriglet"];
+  state.selected="Spriglet";
+  state.creatureXp={};
+  state.evolutionStages={};
+  state.nicknames={};
+  state.wins=0;
+  state.claimed=0;
+  state.completed=[];
+  state.dailyPoints=0;
+  state.weeklyPoints=0;
+  state.weekStart=weekKey();
+  state.weeklyHistory=[];
+
+  save();
+  announce("Adventure progress reset.");
+}
+
+let audio=null;
+let musicTimer=null;
+let musicStep=0;
+
+function tone(frequency,duration=.13,volume=.06,type="sine"){
+  try{
+    audio=audio||new(
+      window.AudioContext||window.webkitAudioContext
+    )();
+
+    if(audio.state==="suspended")audio.resume();
+
+    const oscillator=audio.createOscillator();
+    const gain=audio.createGain();
+
+    oscillator.type=type;
+    oscillator.frequency.value=frequency;
+    gain.gain.setValueAtTime(volume,audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+      .001,audio.currentTime+duration
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+    oscillator.start();
+    oscillator.stop(audio.currentTime+duration);
+  }catch(e){}
+}
+
+function playSound(kind){
+  if(kind==="creature"&&!state.criesOn)return;
+  if(kind!=="creature"&&!state.effectsOn)return;
+
+  const sounds={
+    chore:[523,659,784],
+    victory:[523,659,784,1047],
+    capture:[440,660,880],
+    creature:[330,440],
+    evolve:[392,494,587,784,988]
+  };
+
+  (sounds[kind]||[]).forEach((n,i)=>
+    setTimeout(()=>tone(n),i*110)
+  );
+}
+
+function stopMusic(){
+  if(musicTimer){
+    clearInterval(musicTimer);
+    musicTimer=null;
+  }
+}
+
+function startMusic(){
+  stopMusic();
+  if(!state.musicOn||document.hidden)return;
+
+  const melody=[
+    262,330,392,523,392,330,294,349,
+    440,587,440,349,330,392,494,659
+  ];
+
+  musicTimer=setInterval(()=>{
+    if(state.musicOn&&!document.hidden){
+      tone(melody[musicStep++%melody.length],
+        .19,.017,"triangle");
+    }
+  },330);
+}
+
+function toggleMusic(){
+  state.musicOn=!state.musicOn;
+  save();
+
+  if(state.musicOn)startMusic();
+  else stopMusic();
+
+  render();
+}
+
+function toggleEffects(){
+  state.effectsOn=!state.effectsOn;
+  save();
+  render();
+}
+
+function toggleCries(){
+  state.criesOn=!state.criesOn;
+  save();
+  render();
+}
+
+setInterval(()=>{
+  if(state.name&&
+    (state.lastDay!==dayKey()||
+     state.weekStart!==weekKey())){
+    render();
+  }
+},30000);
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){
+    stopMusic();
+  }else{
+    render();
+    if(state.musicOn)startMusic();
+  }
+});
+
+window.addEventListener("focus",render);
+
+render();
+</script>
+</body>
+</html>
